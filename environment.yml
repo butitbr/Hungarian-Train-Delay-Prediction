@@ -1,0 +1,40 @@
+name: gtfs_env_311
+dependencies:
+  - python=3.11
+  - pandas
+  - geopandas
+  - shapely
+  - conda-forge::utm
+    #"numpy>=1.24.2",
+  - numpy
+  - pendulum<3
+  - branca
+  - plotly
+  - conda-forge::jenkspy
+  - folium
+  - jupyter
+  - conda-build
+  - pip
+  - conda-forge::googlemaps
+  - conda-forge::osmnx
+  - anaconda::python-dotenv
+  - anaconda::beautifulsoup4
+  - plotly::plotly
+  - anaconda::openpyxl
+  - conda-forge::geojson
+  - pytorch::pytorch
+  - anaconda::scikit-learn
+  - anaconda::joblib
+  - anaconda::lxml
+  - anaconda::sqlalchemy
+  - conda-forge::sqlalchemy-utils
+  - anaconda::psycopg2
+  - anaconda::html5lib
+  - anaconda::flask
+
+
+
+  - pip:
+      - unicode
+      - gmplot
+
