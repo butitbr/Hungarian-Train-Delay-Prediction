@@ -1,0 +1,66 @@
+# Environment variables (SECRETS!)
+.env
+
+# Virtual environment
+.venv/
+venv/
+env/
+ENV/
+
+# Data directories (generated)
+data/collected/
+data/gtfs/
+data/weather/
+data/ml_ready/
+data/processed/
+
+# Large binary files
+data/generated_files/*.pkl
+*.pkl
+*.h5
+*.joblib
+
+# Logs
+logs/
+*.log
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Models (usually too large)
+model/
+models/
+
+# Results and reports (generated)
+results/
+reports/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/

@@ -12,10 +12,11 @@ generated_files_path=data_root + 'generated_files/'
 weather_folder = generated_files_path + "odp/"
 model_location="model/"
 
+# OLD API (deprecated): "https://vonatinfo.mav-start.hu/map.aspx/getData"
+# NEW GraphQL API:
+mav_api_url = "https://mavplusz.hu/otp2-backend/otp/routers/default/index/graphql"
 
-
-mav_api_url = "https://vonatinfo.mav-start.hu/map.aspx/getData"
-
+# Legacy hardcoded data (kept for backwards compatibility)
 # ezeken az állomásokon nézzük meg, milyen vonatok közlekednek
 # https://hu.wikipedia.org/wiki/Budapest%E2%80%93Esztergom-vas%C3%BAtvonal
 # https://hu.wikipedia.org/wiki/Kiskunf%C3%A9legyh%C3%A1za%E2%80%93Orosh%C3%A1za-vas%C3%BAtvonal

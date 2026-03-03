@@ -1,0 +1,77 @@
+name: Collect Train Data (Hourly)
+
+on:
+  schedule:
+    # Run every 3 hours: 5 AM, 8 AM, 11 AM, 2 PM, 5 PM, 8 PM, 11 PM, 2 AM UTC (8 times/day)
+    # Optimized for historical data collection (MÁV stores MODIFIED data for hours)
+    - cron: '0 5,8,11,14,17,20,23,2 * * *'
+  
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Full history for proper commits
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Collect train data (incremental mode)
+        env:
+          OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
+        run: |
+          python collect_train_data.py --max-routes 36 --incremental --verbose
+      
+      - name: Check data quality
+        run: |
+          python -c "
+          from pathlib import Path
+          from utils.data_quality import check_data_quality
+          from datetime import datetime
+          
+          # Find today's file
+          date_str = datetime.now().strftime('%Y%m%d')
+          csv_file = Path(f'data/collected/trains_{date_str}.csv')
+          
+          if csv_file.exists():
+              check_data_quality(csv_file, verbose=True)
+          else:
+              print(f'No file found for today: {csv_file}')
+          "
+      
+      - name: Commit and push if changed
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add data/collected/
+          
+          # Check if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+            git commit -m "Auto: Hourly data collection - $TIMESTAMP"
+            git push
+            echo "Changes committed and pushed"
+          fi
+      
+      - name: Upload artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 7
