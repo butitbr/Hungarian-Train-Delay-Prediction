@@ -7,10 +7,10 @@ venv/
 env/
 ENV/
 
-# Data directories (generated)
-data/collected/
+# Downloaded GTFS files (large)
 data/gtfs/
-data/weather/
+
+# Processed datasets (optional to track)
 data/ml_ready/
 data/processed/
 
@@ -20,9 +20,10 @@ data/generated_files/*.pkl
 *.h5
 *.joblib
 
-# Logs
-logs/
-*.log
+# Allow collected data CSVs to be tracked
+!data/collected/*.csv
+!data/weather/*.csv
+!logs/*.log
 
 # Python cache
 __pycache__/
