@@ -7,8 +7,10 @@ venv/
 env/
 ENV/
 
-# Downloaded GTFS files (large)
-data/gtfs/
+# Downloaded GTFS files (but allow stops.txt)
+data/gtfs/*.zip
+data/gtfs/latest/gtfs/*
+!data/gtfs/latest/gtfs/stops.txt
 
 # Processed datasets (optional to track)
 data/ml_ready/

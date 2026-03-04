@@ -1,0 +1,46 @@
+name: Update GTFS Data
+
+on:
+  schedule:
+    # Run on the 1st of every month at 2:00 AM UTC
+    - cron: '0 2 1 * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  update-gtfs:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+      
+      - name: Install dependencies
+        run: |
+          pip install requests python-dotenv
+      
+      - name: Download GTFS data
+        env:
+          GTFS_USER: ${{ secrets.GTFS_USER }}
+          GTFS_PASSWORD: ${{ secrets.GTFS_PASSWORD }}
+        run: |
+          python download_gtfs.py
+      
+      - name: Commit updated stops.txt
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add data/gtfs/latest/gtfs/stops.txt
+          
+          # Check if there are changes
+          if git diff --staged --quiet; then
+            echo "No changes to stops.txt"
+          else
+            git commit -m "Update GTFS stops.txt - $(date -u '+%Y-%m-%d')"
+            git push
+            echo "✅ GTFS data updated"
+          fi
