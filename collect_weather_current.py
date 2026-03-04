@@ -30,7 +30,15 @@ WEATHER_DIR = DATA_ROOT / "weather"
 LOGS_DIR = Path("logs")
 
 # Weather API configuration
-OWM_API_KEY = os.getenv('openweathermap_api_key')
+# Try both uppercase and lowercase variants
+OWM_API_KEY = os.getenv('OPENWEATHERMAP_API_KEY') or os.getenv('openweathermap_api_key')
+
+if not OWM_API_KEY or OWM_API_KEY == '<own_api_key>':
+    raise ValueError(
+        "OpenWeatherMap API key not found! "
+        "Set OPENWEATHERMAP_API_KEY environment variable or add to .env file"
+    )
+
 OWM_CURRENT_URL = "https://api.openweathermap.org/data/2.5/weather"
 
 
@@ -96,10 +104,6 @@ def get_current_weather(lat: float, lon: float, station_name: str, verbose: bool
     Returns:
         Dictionary with current weather data
     """
-    if not OWM_API_KEY:
-        logging.error("OpenWeatherMap API key not found in environment")
-        return {}
-    
     try:
         params = {
             'lat': lat,
