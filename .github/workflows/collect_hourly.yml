@@ -57,21 +57,14 @@ jobs:
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
           git add data/collected/
+          git add logs/
           
           # Check if there are changes
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
             TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
-            git commit -m "Auto: Hourly data collection - $TIMESTAMP"
+            git commit -m "Train data: $TIMESTAMP"
             git push
             echo "Changes committed and pushed"
           fi
-      
-      - name: Upload artifacts (on failure)
-        if: failure()
-        uses: actions/upload-artifact@v3
-        with:
-          name: logs-${{ github.run_id }}
-          path: logs/
-          retention-days: 7
