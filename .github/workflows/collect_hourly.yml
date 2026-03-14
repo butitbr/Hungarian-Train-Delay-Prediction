@@ -33,7 +33,7 @@ jobs:
         env:
           OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
         run: |
-          python collect_train_data.py --max-routes 36 --incremental --verbose
+          python collect_train_data.py --incremental --verbose
       
       - name: Check data quality
         run: |

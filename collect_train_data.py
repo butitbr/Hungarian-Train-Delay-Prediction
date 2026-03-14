@@ -61,7 +61,8 @@ def setup_logging(log_dir: Path) -> logging.Logger:
 
 def get_ic_routes():
     """
-    Fetch all IC (InterCity) routes from the MÁV GraphQL API.
+    Fetch all RAIL routes from the MÁV GraphQL API.
+    (Function name kept for backwards compatibility, now returns all RAIL trains)
     Returns a dict with route_id -> {name, stations, trip_ids}
     """
     query = {
@@ -97,16 +98,12 @@ def get_ic_routes():
         routes = {}
         all_routes = data.get('data', {}).get('routes', [])
         
-        # Filter for IC routes (RAIL mode and name starts with IC)
+        # Filter for RAIL routes (all passenger trains)
         for route in all_routes:
             if route.get('mode') != 'RAIL':
                 continue
             
             route_name = str(route.get('longName', '') or route.get('shortName', ''))
-            # Check if route name starts with IC (avoid matching "Bicske" etc.)
-            if not (route_name.strip().upper().startswith('IC') or 
-                    str(route.get('shortName', '')).strip().upper().startswith('IC')):
-                continue
             
             route_id = route['gtfsId']
             
@@ -133,7 +130,8 @@ def get_ic_routes():
 
 def get_ic_trains(service_date=None, max_routes=None, verbose=True):
     """
-    Fetch all IC train trips with detailed information for a specific date.
+    Fetch all RAIL train trips with detailed information for a specific date.
+    (Function name kept for backwards compatibility, now returns all RAIL trains)
     
     Args:
         service_date: Date string in format "YYYY-MM-DD" (defaults to today)
@@ -155,12 +153,12 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
     }
     
     try:
-        # First, get all IC routes
+        # First, get all RAIL routes
         ic_routes = get_ic_routes()
         
         if verbose:
-            print(f"Fetching IC trains for {service_date}")
-            print(f"Found {len(ic_routes)} IC routes")
+            print(f"Fetching RAIL trains for {service_date}")
+            print(f"Found {len(ic_routes)} RAIL routes")
         
         trains = []
         routes_to_process = list(ic_routes.items())[:max_routes] if max_routes else list(ic_routes.items())
@@ -173,6 +171,10 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
             route_trains = 0
             for trip_id in route_info['trip_ids']:
                 # Query trip details with ALL available fields
+                # IMPORTANT: Use stoptimesForDate with serviceDate parameter to get REAL-TIME data
+                # Format: YYYYMMDD (e.g., "20260314")
+                service_date_formatted = datetime.strptime(service_date, "%Y-%m-%d").strftime("%Y%m%d")
+                
                 trip_query = {
                     "query": f"""{{
                         trip(id: "{trip_id}") {{
@@ -188,7 +190,7 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
                                 shortName
                                 mode
                             }}
-                            stoptimes {{
+                            stoptimesForDate(serviceDate: "{service_date_formatted}") {{
                                 stop {{
                                     name
                                     code
@@ -224,7 +226,7 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
                 data = response.json()
                 
                 trip_data = data.get('data', {}).get('trip')
-                if not trip_data or not trip_data.get('stoptimes'):
+                if not trip_data or not trip_data.get('stoptimesForDate'):
                     continue
                 
                 # Extract detailed stop information
@@ -240,7 +242,7 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
                 departure_delays = []
                 realtime_states = []
                 
-                for st in trip_data.get('stoptimes', []):
+                for st in trip_data.get('stoptimesForDate', []):
                     stops.append(st['stop']['name'])
                     stop_codes.append(st['stop'].get('code'))
                     stop_gtfs_ids.append(st['stop']['gtfsId'])
@@ -473,6 +475,30 @@ def collect_train_data(service_date: str = None, max_routes: int = None,
             return df
         
         logging.info(f"Converted to DataFrame: {len(df)} rows × {len(df.columns)} columns")
+        
+        # Filter for trains that have departed or are departing soon (within last 12 hours or next 2 hours)
+        current_time_seconds = datetime.now().hour * 3600 + datetime.now().minute * 60
+        
+        # Keep records where:
+        # 1. Train has already departed (scheduled_departure < current time)
+        # 2. OR train is departing very soon (within 2 hours)
+        # 3. OR realtime_state is MODIFIED (has actual data)
+        time_window_past = current_time_seconds - (12 * 3600)  # 12 hours ago
+        time_window_future = current_time_seconds + (2 * 3600)  # 2 hours from now
+        
+        before_filter = len(df)
+        df = df[
+            (df['scheduled_departure'] <= time_window_future) |  # Departing soon
+            (df['realtime_state'] == 'MODIFIED')  # Or has actual data
+        ]
+        after_filter = len(df)
+        
+        logging.info(f"Filtered to relevant trains: {before_filter} → {after_filter} records "
+                    f"(removed {before_filter - after_filter} future departures)")
+        
+        if df.empty:
+            logging.warning("No relevant trains after time filtering")
+            return df
         
         # Add collection timestamp
         df['collection_timestamp'] = datetime.now()
