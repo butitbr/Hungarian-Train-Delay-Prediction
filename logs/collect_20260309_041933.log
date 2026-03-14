@@ -1,0 +1,34 @@
+2026-03-09 04:19:33,257 - __main__ - INFO - ============================================================
+2026-03-09 04:19:33,257 - __main__ - INFO - TRAIN DATA COLLECTION STARTED
+2026-03-09 04:19:33,257 - __main__ - INFO - ============================================================
+2026-03-09 04:19:33,258 - __main__ - INFO - Date: today
+2026-03-09 04:19:33,258 - __main__ - INFO - Max routes: 36
+2026-03-09 04:19:33,258 - __main__ - INFO - Weather collection: disabled (use separate forecast collection)
+2026-03-09 04:19:33,258 - __main__ - INFO - Mode: INCREMENTAL (merge)
+2026-03-09 04:19:33,258 - __main__ - INFO - ============================================================
+
+2026-03-09 04:19:33,258 - root - INFO - Collecting train data for 2026-03-09
+2026-03-09 04:19:33,258 - root - INFO - Max routes: 36
+2026-03-09 04:25:14,470 - root - INFO - Fetched 510 trains from API
+2026-03-09 04:25:14,526 - root - INFO - Converted to DataFrame: 6209 rows × 23 columns
+2026-03-09 04:25:14,537 - root - INFO - Incremental save mode: 6209 new records
+2026-03-09 04:25:14,537 - utils.incremental_merge - INFO - No existing file at data/collected/trains_20260309.csv, returning new data
+2026-03-09 04:25:14,597 - root - INFO - Saved 6209 total records to data/collected/trains_20260309.csv
+2026-03-09 04:25:14,597 - root - INFO - File size: 1420.95 KB
+2026-03-09 04:25:14,629 - root - INFO - 
+============================================================
+2026-03-09 04:25:14,629 - root - INFO - COLLECTION SUMMARY
+2026-03-09 04:25:14,629 - root - INFO - ============================================================
+2026-03-09 04:25:14,629 - root - INFO - Total records: 6209
+2026-03-09 04:25:14,630 - root - INFO - Unique trains: 510
+2026-03-09 04:25:14,630 - root - INFO - Unique routes: 36
+2026-03-09 04:25:14,631 - root - INFO - Unique stations: 286
+2026-03-09 04:25:14,632 - root - INFO - 
+Realtime data:
+2026-03-09 04:25:14,632 - root - INFO -   - Modified states: 0 (0.0%)
+2026-03-09 04:25:14,632 - root - INFO -   - Records with delays: 0 (0.0%)
+2026-03-09 04:25:14,632 - root - INFO - ============================================================
+
+2026-03-09 04:25:14,632 - __main__ - INFO - ============================================================
+2026-03-09 04:25:14,632 - __main__ - INFO - COLLECTION COMPLETED SUCCESSFULLY
+2026-03-09 04:25:14,632 - __main__ - INFO - ============================================================
