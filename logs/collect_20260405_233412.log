@@ -1,0 +1,38 @@
+2026-04-05 23:34:12,159 - __main__ - INFO - ============================================================
+2026-04-05 23:34:12,159 - __main__ - INFO - TRAIN DATA COLLECTION STARTED
+2026-04-05 23:34:12,159 - __main__ - INFO - ============================================================
+2026-04-05 23:34:12,159 - __main__ - INFO - Date: today
+2026-04-05 23:34:12,160 - __main__ - INFO - Max routes: all
+2026-04-05 23:34:12,160 - __main__ - INFO - Weather collection: disabled (use separate forecast collection)
+2026-04-05 23:34:12,160 - __main__ - INFO - Mode: INCREMENTAL (merge)
+2026-04-05 23:34:12,160 - __main__ - INFO - ============================================================
+
+2026-04-05 23:34:12,160 - root - INFO - Collecting train data for 2026-04-05
+2026-04-05 23:34:12,160 - root - INFO - Max routes: all
+2026-04-06 00:12:40,888 - root - INFO - Fetched 3773 trains from API
+2026-04-06 00:12:41,208 - root - INFO - Converted to DataFrame: 44866 rows × 23 columns
+2026-04-06 00:12:41,212 - root - INFO - Filtered to relevant trains: 44866 → 891 records (removed 43975 future departures)
+2026-04-06 00:12:41,248 - root - INFO - Incremental save mode: 891 new records
+2026-04-06 00:12:41,248 - utils.incremental_merge - INFO - No existing file at data/collected/trains_20260406.csv, returning new data
+2026-04-06 00:12:41,259 - root - INFO - Saved 891 total records to data/collected/trains_20260406.csv
+2026-04-06 00:12:41,259 - root - INFO - File size: 200.82 KB
+2026-04-06 00:12:41,270 - root - INFO - 
+============================================================
+2026-04-06 00:12:41,270 - root - INFO - COLLECTION SUMMARY
+2026-04-06 00:12:41,271 - root - INFO - ============================================================
+2026-04-06 00:12:41,271 - root - INFO - Total records: 891
+2026-04-06 00:12:41,271 - root - INFO - Unique trains: 64
+2026-04-06 00:12:41,271 - root - INFO - Unique routes: 24
+2026-04-06 00:12:41,271 - root - INFO - Unique stations: 339
+2026-04-06 00:12:41,272 - root - INFO - 
+Realtime data:
+2026-04-06 00:12:41,272 - root - INFO -   - Modified states: 493 (55.3%)
+2026-04-06 00:12:41,272 - root - INFO -   - Records with delays: 315 (35.4%)
+2026-04-06 00:12:41,273 - root - INFO -   - Average delay: 3.1 minutes
+2026-04-06 00:12:41,273 - root - INFO -   - Max delay: 27.0 minutes
+2026-04-06 00:12:41,273 - root - INFO -   - Min delay: -7.0 minutes
+2026-04-06 00:12:41,273 - root - INFO - ============================================================
+
+2026-04-06 00:12:41,274 - __main__ - INFO - ============================================================
+2026-04-06 00:12:41,274 - __main__ - INFO - COLLECTION COMPLETED SUCCESSFULLY
+2026-04-06 00:12:41,274 - __main__ - INFO - ============================================================
