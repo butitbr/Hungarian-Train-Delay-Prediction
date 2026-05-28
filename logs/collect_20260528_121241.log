@@ -1,0 +1,42 @@
+2026-05-28 12:12:41,578 - __main__ - INFO - ============================================================
+2026-05-28 12:12:41,578 - __main__ - INFO - TRAIN DATA COLLECTION STARTED
+2026-05-28 12:12:41,578 - __main__ - INFO - ============================================================
+2026-05-28 12:12:41,578 - __main__ - INFO - Date: today
+2026-05-28 12:12:41,578 - __main__ - INFO - Max routes: all
+2026-05-28 12:12:41,579 - __main__ - INFO - Weather collection: disabled (use separate forecast collection)
+2026-05-28 12:12:41,579 - __main__ - INFO - Mode: INCREMENTAL (merge)
+2026-05-28 12:12:41,579 - __main__ - INFO - ============================================================
+
+2026-05-28 12:12:41,579 - root - INFO - Collecting train data for 2026-05-28
+2026-05-28 12:12:41,579 - root - INFO - Max routes: all
+2026-05-28 12:50:23,998 - root - INFO - Fetched 4054 trains from API
+2026-05-28 12:50:24,377 - root - INFO - Converted to DataFrame: 51486 rows × 23 columns
+2026-05-28 12:50:24,386 - root - INFO - Filtered to relevant trains: 51486 → 29139 records (removed 22347 future departures)
+2026-05-28 12:50:24,427 - root - INFO - Incremental save mode: 29139 new records
+2026-05-28 12:50:24,557 - utils.incremental_merge - INFO - Loaded 33154 existing records from trains_20260528.csv
+2026-05-28 12:50:25,164 - utils.incremental_merge - INFO - Merge analysis: 11465 new, 17674 to update, 15480 unchanged
+2026-05-28 12:50:25,325 - utils.incremental_merge - INFO - Adding 11465 completely new records
+2026-05-28 12:51:53,990 - utils.incremental_merge - INFO - Updated 8308 records, preserved 9366 records
+2026-05-28 12:52:01,012 - utils.incremental_merge - INFO - Merge complete: 44619 total records
+2026-05-28 12:52:02,544 - root - INFO - Saved 44619 total records to data/collected/trains_20260528.csv
+2026-05-28 12:52:02,547 - root - INFO - File size: 10865.10 KB
+2026-05-28 12:52:03,031 - root - INFO - 
+============================================================
+2026-05-28 12:52:03,031 - root - INFO - COLLECTION SUMMARY
+2026-05-28 12:52:03,031 - root - INFO - ============================================================
+2026-05-28 12:52:03,031 - root - INFO - Total records: 29139
+2026-05-28 12:52:03,032 - root - INFO - Unique trains: 2479
+2026-05-28 12:52:03,033 - root - INFO - Unique routes: 428
+2026-05-28 12:52:03,034 - root - INFO - Unique stations: 1320
+2026-05-28 12:52:03,034 - root - INFO - 
+Realtime data:
+2026-05-28 12:52:03,034 - root - INFO -   - Modified states: 4417 (15.2%)
+2026-05-28 12:52:03,035 - root - INFO -   - Records with delays: 2954 (10.1%)
+2026-05-28 12:52:03,038 - root - INFO -   - Average delay: 4.9 minutes
+2026-05-28 12:52:03,038 - root - INFO -   - Max delay: 82.0 minutes
+2026-05-28 12:52:03,038 - root - INFO -   - Min delay: -28.0 minutes
+2026-05-28 12:52:03,038 - root - INFO - ============================================================
+
+2026-05-28 12:52:03,038 - __main__ - INFO - ============================================================
+2026-05-28 12:52:03,038 - __main__ - INFO - COLLECTION COMPLETED SUCCESSFULLY
+2026-05-28 12:52:03,038 - __main__ - INFO - ============================================================
