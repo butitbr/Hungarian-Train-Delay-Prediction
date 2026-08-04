@@ -13,8 +13,10 @@ weather_folder = generated_files_path + "odp/"
 model_location="model/"
 
 # OLD API (deprecated): "https://vonatinfo.mav-start.hu/map.aspx/getData"
-# NEW GraphQL API:
+# GraphQL API - primary (OTP 2 legacy endpoint)
 mav_api_url = "https://mavplusz.hu/otp2-backend/otp/routers/default/index/graphql"
+# Fallback - newer OTP 2.2+ GTFS GraphQL endpoint (tried if primary returns empty/error)
+mav_api_url_fallback = "https://mavplusz.hu/otp2-backend/otp/gtfs/v1"
 
 # Legacy hardcoded data (kept for backwards compatibility)
 # ezeken az állomásokon nézzük meg, milyen vonatok közlekednek

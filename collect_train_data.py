@@ -25,7 +25,7 @@ import requests
 from dotenv import load_dotenv
 
 # Import API URL from config
-from config import mav_api_url
+from config import mav_api_url, mav_api_url_fallback
 
 # Load environment variables
 load_dotenv()
@@ -59,6 +59,31 @@ def setup_logging(log_dir: Path) -> logging.Logger:
     return logging.getLogger(__name__)
 
 
+def _post_graphql(url, query, headers, timeout=30):
+    """
+    Make a GraphQL POST request and return parsed JSON, or None on failure.
+    Logs diagnostic information on unexpected responses.
+    """
+    try:
+        response = requests.post(url, json=query, headers=headers, timeout=timeout)
+        if response.status_code != 200:
+            logging.warning(f"API returned HTTP {response.status_code} from {url}")
+            logging.warning(f"Response body: {response.text[:500]!r}")
+            return None
+        if not response.text.strip():
+            logging.warning(f"API returned empty body from {url}")
+            return None
+        try:
+            return response.json()
+        except json.JSONDecodeError as e:
+            logging.warning(f"API returned non-JSON from {url}: {e}")
+            logging.warning(f"Response body preview: {response.text[:300]!r}")
+            return None
+    except requests.exceptions.RequestException as e:
+        logging.warning(f"Request to {url} failed: {e}")
+        return None
+
+
 def get_ic_routes():
     """
     Fetch all RAIL routes from the MÁV GraphQL API.
@@ -86,46 +111,58 @@ def get_ic_routes():
     
     headers = {
         'Content-Type': 'application/json',
-        'Accept': '*/*',
+        'Accept': 'application/json',
         'Origin': 'https://mavplusz.hu',
-        'Referer': 'https://mavplusz.hu/'
+        'Referer': 'https://mavplusz.hu/',
+        'User-Agent': 'Mozilla/5.0 (compatible; train-data-collector/1.0)'
     }
     
-    try:
-        response = requests.post(mav_api_url, json=query, headers=headers, timeout=30)
-        data = response.json()
-        
-        routes = {}
-        all_routes = data.get('data', {}).get('routes', [])
-        
-        # Filter for RAIL routes (all passenger trains)
-        for route in all_routes:
-            if route.get('mode') != 'RAIL':
-                continue
-            
-            route_name = str(route.get('longName', '') or route.get('shortName', ''))
-            
-            route_id = route['gtfsId']
-            
-            # Get unique stations from all patterns
-            all_stations = set()
-            all_trips = set()
-            for pattern in route.get('patterns', []):
-                for stop in pattern.get('stops', []):
-                    all_stations.add(stop['name'])
-                for trip in pattern.get('trips', []):
-                    all_trips.add(trip['gtfsId'])
-            
-            routes[route_id] = {
-                'name': route_name,
-                'stations': sorted(list(all_stations)),
-                'trip_ids': sorted(list(all_trips))
-            }
-        
-        return routes
-    except Exception as e:
-        print(f"Error fetching IC routes: {e}")
+    # Try primary URL, then fallback URL
+    urls_to_try = [mav_api_url]
+    if mav_api_url_fallback and mav_api_url_fallback != mav_api_url:
+        urls_to_try.append(mav_api_url_fallback)
+
+    data = None
+    for url in urls_to_try:
+        logging.info(f"Trying API endpoint: {url}")
+        data = _post_graphql(url, query, headers)
+        if data is not None:
+            logging.info(f"Successfully connected to: {url}")
+            break
+        logging.warning(f"No valid response from: {url}")
+
+    if data is None:
+        logging.error("All API endpoints failed. Check network access and URL configuration.")
         return {}
+
+    routes = {}
+    all_routes = data.get('data', {}).get('routes', [])
+    
+    # Filter for RAIL routes (all passenger trains)
+    for route in all_routes:
+        if route.get('mode') != 'RAIL':
+            continue
+        
+        route_name = str(route.get('longName', '') or route.get('shortName', ''))
+        
+        route_id = route['gtfsId']
+        
+        # Get unique stations from all patterns
+        all_stations = set()
+        all_trips = set()
+        for pattern in route.get('patterns', []):
+            for stop in pattern.get('stops', []):
+                all_stations.add(stop['name'])
+            for trip in pattern.get('trips', []):
+                all_trips.add(trip['gtfsId'])
+        
+        routes[route_id] = {
+            'name': route_name,
+            'stations': sorted(list(all_stations)),
+            'trip_ids': sorted(list(all_trips))
+        }
+    
+    return routes
 
 
 def get_ic_trains(service_date=None, max_routes=None, verbose=True):
@@ -147,11 +184,12 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
     
     headers = {
         'Content-Type': 'application/json',
-        'Accept': '*/*',
+        'Accept': 'application/json',
         'Origin': 'https://mavplusz.hu',
-        'Referer': 'https://mavplusz.hu/'
+        'Referer': 'https://mavplusz.hu/',
+        'User-Agent': 'Mozilla/5.0 (compatible; train-data-collector/1.0)'
     }
-    
+
     try:
         # First, get all RAIL routes
         ic_routes = get_ic_routes()
@@ -215,16 +253,15 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
                     }}"""
                 }
                 
-                response = requests.post(mav_api_url, json=trip_query, headers=headers, timeout=10)
+                data = _post_graphql(mav_api_url, trip_query, headers, timeout=10)
+                if data is None:
+                    # Try fallback URL for individual trip queries too
+                    if mav_api_url_fallback and mav_api_url_fallback != mav_api_url:
+                        data = _post_graphql(mav_api_url_fallback, trip_query, headers, timeout=10)
                 
-                # Check if response has content before parsing
-                if not response.text or response.status_code != 200:
-                    if verbose:
-                        print(f"    Empty/invalid response for trip {trip_id} (status: {response.status_code})")
+                if data is None:
                     continue
-                
-                data = response.json()
-                
+
                 trip_data = data.get('data', {}).get('trip')
                 if not trip_data or not trip_data.get('stoptimesForDate'):
                     continue
