@@ -9,6 +9,7 @@ on:
 jobs:
   collect:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -30,7 +31,7 @@ jobs:
         env:
           OPENWEATHERMAP_API_KEY: ${{ secrets.OPENWEATHERMAP_API_KEY }}
         run: |
-          python collect_train_data.py --incremental --verbose
+          python collect_train_data.py --incremental --verbose --batch-size 5 --max-concurrent 3
           EXIT_CODE=$?
           if [ $EXIT_CODE -ne 0 ]; then
             echo "::error::Collection script exited with code $EXIT_CODE"
