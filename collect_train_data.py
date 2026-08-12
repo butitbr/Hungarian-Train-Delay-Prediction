@@ -17,6 +17,7 @@ import sys
 import json
 import logging
 import argparse
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -40,6 +41,8 @@ LOGS_DIR = Path("logs")
 # Weather API configuration
 OWM_API_KEY = os.getenv('openweathermap_api_key')
 OWM_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+INTER_BATCH_DELAY_SECONDS = 0.2
+TRIP_ID_PATTERN = re.compile(r'^[A-Za-z0-9:_\-.]+$')
 
 
 def setup_logging(log_dir: Path) -> logging.Logger:
@@ -123,11 +126,18 @@ def build_batch_trip_query(trip_ids, service_date_formatted):
     Build a GraphQL query that fetches multiple trips using aliases.
     """
     if not trip_ids:
-        return None
+        return None, []
 
     trip_queries = []
-    for idx, trip_id in enumerate(trip_ids):
-        safe_trip_id = str(trip_id).replace('"', '\\"')
+    valid_trip_ids = []
+    for trip_id in trip_ids:
+        candidate_trip_id = str(trip_id)
+        if not TRIP_ID_PATTERN.fullmatch(candidate_trip_id):
+            logging.warning(f"Skipping trip with invalid characters in trip_id: {candidate_trip_id!r}")
+            continue
+        valid_trip_ids.append(candidate_trip_id)
+
+    for idx, safe_trip_id in enumerate(valid_trip_ids):
         trip_queries.append(
             f"""
             trip_{idx}: trip(id: "{safe_trip_id}") {{
@@ -168,7 +178,10 @@ def build_batch_trip_query(trip_ids, service_date_formatted):
             """
         )
 
-    return "{ " + " ".join(trip_queries) + " }"
+    if not trip_queries:
+        return None, []
+
+    return "{ " + " ".join(trip_queries) + " }", valid_trip_ids
 
 
 def _trip_data_to_record(trip_id, route_info, trip_data, service_date):
@@ -236,7 +249,7 @@ async def _process_single_route_batches(session, semaphore, route_info, service_
         start_idx = batch_idx * batch_size
         end_idx = min((batch_idx + 1) * batch_size, len(trip_ids))
         batch_trip_ids = trip_ids[start_idx:end_idx]
-        batch_query_str = build_batch_trip_query(batch_trip_ids, service_date_formatted)
+        batch_query_str, query_trip_ids = build_batch_trip_query(batch_trip_ids, service_date_formatted)
         if not batch_query_str:
             continue
 
@@ -260,13 +273,13 @@ async def _process_single_route_batches(session, semaphore, route_info, service_
             continue
 
         batch_data = data.get('data', {})
-        for alias_idx, trip_id in enumerate(batch_trip_ids):
+        for alias_idx, trip_id in enumerate(query_trip_ids):
             trip_data = batch_data.get(f"trip_{alias_idx}")
             if not trip_data or not trip_data.get('stoptimesForDate'):
                 continue
             route_trains.append(_trip_data_to_record(trip_id, route_info, trip_data, service_date))
 
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(INTER_BATCH_DELAY_SECONDS)
 
     return route_trains
 
@@ -310,7 +323,7 @@ async def process_batches_concurrent(routes_to_process, service_date, headers, b
             trains.extend(route_trains)
             completed_routes += 1
             if verbose:
-                print(f"  [{completed_routes}/{total_routes}] completed: {len(route_trains)} running")
+                print(f"  [{completed_routes}/{total_routes}] completed: {len(route_trains)} trains collected")
 
     return trains
 
@@ -598,7 +611,7 @@ def get_ic_trains_concurrent(service_date=None, max_routes=None, verbose=True, b
         )
 
         if verbose:
-            print(f"\n✓ Total: {len(trains)} IC trains running on {service_date}")
+            print(f"\n✓ Total: {len(trains)} IC trains collected for {service_date}")
 
         return trains
 
