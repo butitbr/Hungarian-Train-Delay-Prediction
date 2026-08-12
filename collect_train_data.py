@@ -42,6 +42,7 @@ LOGS_DIR = Path("logs")
 OWM_API_KEY = os.getenv('openweathermap_api_key')
 OWM_BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 INTER_BATCH_DELAY_SECONDS = 0.2
+REQUEST_TIMEOUT_SECONDS = 10
 TRIP_ID_PATTERN = re.compile(r'^[A-Za-z0-9:_\-.]+$')
 
 
@@ -285,22 +286,24 @@ async def _process_single_route_batches(session, semaphore, route_info, service_
 
 
 async def process_batches_concurrent(routes_to_process, service_date, headers, batch_size=5,
-                                     max_concurrent=3, request_timeout=10, verbose=True):
+                                     max_concurrent=3, request_timeout=REQUEST_TIMEOUT_SECONDS, verbose=True):
     """
     Process route batches concurrently with bounded request concurrency.
     """
     service_date_formatted = datetime.strptime(service_date, "%Y-%m-%d").strftime("%Y%m%d")
     semaphore = asyncio.Semaphore(max_concurrent)
-    urls_to_try = [mav_api_url]
-    if mav_api_url_fallback and mav_api_url_fallback != mav_api_url:
-        urls_to_try.append(mav_api_url_fallback)
+    urls_to_try = [url for url in [mav_api_url, mav_api_url_fallback] if url]
+    if not urls_to_try:
+        logging.error("No configured MÁV API URL available for concurrent batch processing.")
+        return []
 
-    connector = aiohttp.TCPConnector(limit=max(max_concurrent * 2, 10))
     trains = []
     total_routes = len(routes_to_process)
     completed_routes = 0
 
-    async with aiohttp.ClientSession(connector=connector) as session:
+    async with aiohttp.ClientSession(
+        connector=aiohttp.TCPConnector(limit=max(max_concurrent * 2, 10))
+    ) as session:
         tasks = [
             asyncio.create_task(
                 _process_single_route_batches(
@@ -319,7 +322,11 @@ async def process_batches_concurrent(routes_to_process, service_date, headers, b
         ]
 
         for route_task in asyncio.as_completed(tasks):
-            route_trains = await route_task
+            try:
+                route_trains = await route_task
+            except Exception as e:
+                logging.error(f"Route batch task failed: {e}", exc_info=True)
+                route_trains = []
             trains.extend(route_trains)
             completed_routes += 1
             if verbose:
@@ -574,7 +581,8 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
         return []
 
 
-def get_ic_trains_concurrent(service_date=None, max_routes=None, verbose=True, batch_size=5, max_concurrent=3):
+def get_ic_trains_concurrent(service_date=None, max_routes=None, verbose=True, batch_size=5,
+                             max_concurrent=3, request_timeout=REQUEST_TIMEOUT_SECONDS):
     """
     Fetch RAIL train trips using batched GraphQL queries with async concurrency.
     """
@@ -598,6 +606,17 @@ def get_ic_trains_concurrent(service_date=None, max_routes=None, verbose=True, b
 
         routes_to_process = list(ic_routes.items())[:max_routes] if max_routes else list(ic_routes.items())
 
+        try:
+            asyncio.get_running_loop()
+            logging.error(
+                "Concurrent train collection cannot start because an event loop is already running. "
+                "Run this function from a regular Python process/CLI context."
+            )
+            return []
+        except RuntimeError:
+            # No running event loop in this thread; safe to use asyncio.run
+            pass
+
         trains = asyncio.run(
             process_batches_concurrent(
                 routes_to_process=routes_to_process,
@@ -605,18 +624,18 @@ def get_ic_trains_concurrent(service_date=None, max_routes=None, verbose=True, b
                 headers=headers,
                 batch_size=batch_size,
                 max_concurrent=max_concurrent,
-                request_timeout=10,
+                request_timeout=request_timeout,
                 verbose=verbose
             )
         )
 
         if verbose:
-            print(f"\n✓ Total: {len(trains)} IC trains collected for {service_date}")
+            print(f"\n✓ Total: {len(trains)} RAIL trains collected for {service_date}")
 
         return trains
 
     except Exception as e:
-        logging.error(f"Error fetching IC trains concurrently: {e}", exc_info=True)
+        logging.error(f"Error fetching RAIL trains concurrently: {e}", exc_info=True)
         return []
 
 
@@ -763,7 +782,8 @@ def load_station_coordinates() -> pd.DataFrame:
 
 def collect_train_data(service_date: str = None, max_routes: int = None,
                        verbose: bool = True, batch_size: int = 5,
-                       max_concurrent: int = 3) -> pd.DataFrame:
+                       max_concurrent: int = 3,
+                       request_timeout: int = REQUEST_TIMEOUT_SECONDS) -> pd.DataFrame:
     """
     Collect train data from MÁV API.
     
@@ -773,6 +793,7 @@ def collect_train_data(service_date: str = None, max_routes: int = None,
         verbose: Print progress information
         batch_size: Number of trips per GraphQL batch query
         max_concurrent: Maximum number of concurrent API requests
+        request_timeout: Timeout per API request in seconds
         
     Returns:
         DataFrame with collected train data
@@ -784,6 +805,7 @@ def collect_train_data(service_date: str = None, max_routes: int = None,
     logging.info(f"Max routes: {max_routes if max_routes else 'all'}")
     logging.info(f"Batch size: {batch_size}")
     logging.info(f"Max concurrent requests: {max_concurrent}")
+    logging.info(f"Request timeout (s): {request_timeout}")
     
     try:
         # Fetch IC trains from API
@@ -792,7 +814,8 @@ def collect_train_data(service_date: str = None, max_routes: int = None,
             max_routes=max_routes,
             verbose=verbose,
             batch_size=batch_size,
-            max_concurrent=max_concurrent
+            max_concurrent=max_concurrent,
+            request_timeout=request_timeout
         )
         
         if not trains:
