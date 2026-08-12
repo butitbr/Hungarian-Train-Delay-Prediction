@@ -8,9 +8,10 @@ Collects real-time train data from MÁV GraphQL API including:
 - Weather data for departure stations
 
 Usage:
-    python collect_train_data.py [--max-routes N] [--verbose]
+    python collect_train_data.py [--max-routes N] [--verbose] [--batch-size N] [--max-concurrent N]
 """
 
+import asyncio
 import os
 import sys
 import json
@@ -20,6 +21,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import aiohttp
 import pandas as pd
 import requests
 from dotenv import load_dotenv
@@ -82,6 +84,235 @@ def _post_graphql(url, query, headers, timeout=30):
     except requests.exceptions.RequestException as e:
         logging.warning(f"Request to {url} failed: {e}")
         return None
+
+
+async def _post_graphql_async(session, url, query, headers, timeout=10, max_retries=3):
+    """
+    Make an async GraphQL POST request with retry and exponential backoff.
+    Returns parsed JSON, or None on failure.
+    """
+    for attempt in range(max_retries):
+        try:
+            request_timeout = aiohttp.ClientTimeout(total=timeout)
+            async with session.post(url, json=query, headers=headers, timeout=request_timeout) as response:
+                response_text = await response.text()
+                if response.status != 200:
+                    logging.warning(f"API returned HTTP {response.status} from {url}")
+                    logging.warning(f"Response body: {response_text[:500]!r}")
+                elif not response_text.strip():
+                    logging.warning(f"API returned empty body from {url}")
+                else:
+                    try:
+                        return json.loads(response_text)
+                    except json.JSONDecodeError as e:
+                        logging.warning(f"API returned non-JSON from {url}: {e}")
+                        logging.warning(f"Response body preview: {response_text[:300]!r}")
+
+        except (asyncio.TimeoutError, aiohttp.ClientError) as e:
+            logging.warning(f"Async request to {url} failed: {e}")
+
+        if attempt < max_retries - 1:
+            backoff_seconds = 2 ** attempt
+            await asyncio.sleep(backoff_seconds)
+
+    return None
+
+
+def build_batch_trip_query(trip_ids, service_date_formatted):
+    """
+    Build a GraphQL query that fetches multiple trips using aliases.
+    """
+    if not trip_ids:
+        return None
+
+    trip_queries = []
+    for idx, trip_id in enumerate(trip_ids):
+        safe_trip_id = str(trip_id).replace('"', '\\"')
+        trip_queries.append(
+            f"""
+            trip_{idx}: trip(id: "{safe_trip_id}") {{
+                gtfsId
+                tripShortName
+                tripHeadsign
+                routeShortName
+                directionId
+                serviceId
+                activeDates
+                route {{
+                    longName
+                    shortName
+                    mode
+                }}
+                stoptimesForDate(serviceDate: "{service_date_formatted}") {{
+                    stop {{
+                        name
+                        code
+                        gtfsId
+                        platformCode
+                    }}
+                    scheduledArrival
+                    scheduledDeparture
+                    realtimeArrival
+                    realtimeDeparture
+                    arrivalDelay
+                    departureDelay
+                    timepoint
+                    realtime
+                    realtimeState
+                    serviceDay
+                    pickupType
+                    dropoffType
+                    headsign
+                }}
+            }}
+            """
+        )
+
+    return "{ " + " ".join(trip_queries) + " }"
+
+
+def _trip_data_to_record(trip_id, route_info, trip_data, service_date):
+    """
+    Convert GraphQL trip payload to the train record format expected by downstream code.
+    """
+    stops = []
+    stop_codes = []
+    stop_gtfs_ids = []
+    platforms = []
+    scheduled_arrivals = []
+    scheduled_departures = []
+    realtime_arrivals = []
+    realtime_departures = []
+    arrival_delays = []
+    departure_delays = []
+    realtime_states = []
+
+    for st in trip_data.get('stoptimesForDate', []):
+        stops.append(st['stop']['name'])
+        stop_codes.append(st['stop'].get('code'))
+        stop_gtfs_ids.append(st['stop']['gtfsId'])
+        platforms.append(st['stop'].get('platformCode'))
+        scheduled_arrivals.append(st.get('scheduledArrival'))
+        scheduled_departures.append(st.get('scheduledDeparture'))
+        realtime_arrivals.append(st.get('realtimeArrival'))
+        realtime_departures.append(st.get('realtimeDeparture'))
+        arrival_delays.append(st.get('arrivalDelay', 0))
+        departure_delays.append(st.get('departureDelay', 0))
+        realtime_states.append(st.get('realtimeState', 'SCHEDULED'))
+
+    return {
+        'trip_id': trip_id,
+        'train_number': trip_data.get('tripShortName', trip_data.get('routeShortName', 'N/A')),
+        'route_name': trip_data.get('route', {}).get('longName', route_info['name']),
+        'headsign': trip_data.get('tripHeadsign', 'N/A'),
+        'direction_id': trip_data.get('directionId'),
+        'service_id': trip_data.get('serviceId'),
+        'active_dates': trip_data.get('activeDates', []),
+        'stops': stops,
+        'stop_codes': stop_codes,
+        'stop_gtfs_ids': stop_gtfs_ids,
+        'platforms': platforms,
+        'scheduled_arrivals': scheduled_arrivals,
+        'scheduled_departures': scheduled_departures,
+        'realtime_arrivals': realtime_arrivals,
+        'realtime_departures': realtime_departures,
+        'arrival_delays': arrival_delays,
+        'departure_delays': departure_delays,
+        'realtime_states': realtime_states,
+        'service_date': service_date
+    }
+
+
+async def _process_single_route_batches(session, semaphore, route_info, service_date, service_date_formatted,
+                                        headers, urls_to_try, batch_size, request_timeout):
+    """
+    Process one route's trips in batched GraphQL requests.
+    """
+    route_trains = []
+    trip_ids = route_info['trip_ids']
+    total_batches = (len(trip_ids) + batch_size - 1) // batch_size
+
+    for batch_idx in range(total_batches):
+        start_idx = batch_idx * batch_size
+        end_idx = min((batch_idx + 1) * batch_size, len(trip_ids))
+        batch_trip_ids = trip_ids[start_idx:end_idx]
+        batch_query_str = build_batch_trip_query(batch_trip_ids, service_date_formatted)
+        if not batch_query_str:
+            continue
+
+        batch_query = {"query": batch_query_str}
+        data = None
+
+        async with semaphore:
+            for url in urls_to_try:
+                data = await _post_graphql_async(
+                    session,
+                    url,
+                    batch_query,
+                    headers,
+                    timeout=request_timeout
+                )
+                if data is not None:
+                    break
+
+        if data is None:
+            logging.warning(f"Batch {batch_idx + 1}/{total_batches} failed for route {route_info['name']}")
+            continue
+
+        batch_data = data.get('data', {})
+        for alias_idx, trip_id in enumerate(batch_trip_ids):
+            trip_data = batch_data.get(f"trip_{alias_idx}")
+            if not trip_data or not trip_data.get('stoptimesForDate'):
+                continue
+            route_trains.append(_trip_data_to_record(trip_id, route_info, trip_data, service_date))
+
+        await asyncio.sleep(0.2)
+
+    return route_trains
+
+
+async def process_batches_concurrent(routes_to_process, service_date, headers, batch_size=5,
+                                     max_concurrent=3, request_timeout=10, verbose=True):
+    """
+    Process route batches concurrently with bounded request concurrency.
+    """
+    service_date_formatted = datetime.strptime(service_date, "%Y-%m-%d").strftime("%Y%m%d")
+    semaphore = asyncio.Semaphore(max_concurrent)
+    urls_to_try = [mav_api_url]
+    if mav_api_url_fallback and mav_api_url_fallback != mav_api_url:
+        urls_to_try.append(mav_api_url_fallback)
+
+    connector = aiohttp.TCPConnector(limit=max(max_concurrent * 2, 10))
+    trains = []
+    total_routes = len(routes_to_process)
+    completed_routes = 0
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        tasks = [
+            asyncio.create_task(
+                _process_single_route_batches(
+                    session=session,
+                    semaphore=semaphore,
+                    route_info=route_info,
+                    service_date=service_date,
+                    service_date_formatted=service_date_formatted,
+                    headers=headers,
+                    urls_to_try=urls_to_try,
+                    batch_size=batch_size,
+                    request_timeout=request_timeout
+                )
+            )
+            for _, route_info in routes_to_process
+        ]
+
+        for route_task in asyncio.as_completed(tasks):
+            route_trains = await route_task
+            trains.extend(route_trains)
+            completed_routes += 1
+            if verbose:
+                print(f"  [{completed_routes}/{total_routes}] completed: {len(route_trains)} running")
+
+    return trains
 
 
 def get_ic_routes():
@@ -330,6 +561,52 @@ def get_ic_trains(service_date=None, max_routes=None, verbose=True):
         return []
 
 
+def get_ic_trains_concurrent(service_date=None, max_routes=None, verbose=True, batch_size=5, max_concurrent=3):
+    """
+    Fetch RAIL train trips using batched GraphQL queries with async concurrency.
+    """
+    if service_date is None:
+        service_date = datetime.now().strftime("%Y-%m-%d")
+
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': 'https://mavplusz.hu',
+        'Referer': 'https://mavplusz.hu/',
+        'User-Agent': 'Mozilla/5.0 (compatible; train-data-collector/1.0)'
+    }
+
+    try:
+        ic_routes = get_ic_routes()
+
+        if verbose:
+            print(f"Fetching RAIL trains for {service_date} (concurrent mode)")
+            print(f"Found {len(ic_routes)} RAIL routes")
+
+        routes_to_process = list(ic_routes.items())[:max_routes] if max_routes else list(ic_routes.items())
+
+        trains = asyncio.run(
+            process_batches_concurrent(
+                routes_to_process=routes_to_process,
+                service_date=service_date,
+                headers=headers,
+                batch_size=batch_size,
+                max_concurrent=max_concurrent,
+                request_timeout=10,
+                verbose=verbose
+            )
+        )
+
+        if verbose:
+            print(f"\n✓ Total: {len(trains)} IC trains running on {service_date}")
+
+        return trains
+
+    except Exception as e:
+        logging.error(f"Error fetching IC trains concurrently: {e}", exc_info=True)
+        return []
+
+
 def trains_to_dataframe(trains_data):
     """
     Convert train data to pandas DataFrame.
@@ -471,8 +748,9 @@ def load_station_coordinates() -> pd.DataFrame:
         return pd.DataFrame(columns=['stop_name', 'stop_lat', 'stop_lon'])
 
 
-def collect_train_data(service_date: str = None, max_routes: int = None, 
-                       verbose: bool = True) -> pd.DataFrame:
+def collect_train_data(service_date: str = None, max_routes: int = None,
+                       verbose: bool = True, batch_size: int = 5,
+                       max_concurrent: int = 3) -> pd.DataFrame:
     """
     Collect train data from MÁV API.
     
@@ -480,6 +758,8 @@ def collect_train_data(service_date: str = None, max_routes: int = None,
         service_date: Date in format YYYY-MM-DD (default: today)
         max_routes: Maximum number of routes to fetch (None = all)
         verbose: Print progress information
+        batch_size: Number of trips per GraphQL batch query
+        max_concurrent: Maximum number of concurrent API requests
         
     Returns:
         DataFrame with collected train data
@@ -489,13 +769,17 @@ def collect_train_data(service_date: str = None, max_routes: int = None,
     
     logging.info(f"Collecting train data for {service_date}")
     logging.info(f"Max routes: {max_routes if max_routes else 'all'}")
+    logging.info(f"Batch size: {batch_size}")
+    logging.info(f"Max concurrent requests: {max_concurrent}")
     
     try:
         # Fetch IC trains from API
-        trains = get_ic_trains(
+        trains = get_ic_trains_concurrent(
             service_date=service_date,
             max_routes=max_routes,
-            verbose=verbose
+            verbose=verbose,
+            batch_size=batch_size,
+            max_concurrent=max_concurrent
         )
         
         if not trains:
@@ -788,8 +1072,25 @@ def main():
         action='store_true',
         help='Use incremental merge (preserve actual delays, prevent duplicates)'
     )
+    parser.add_argument(
+        '--batch-size',
+        type=int,
+        default=5,
+        help='Number of trips per GraphQL query (default: 5)'
+    )
+    parser.add_argument(
+        '--max-concurrent',
+        type=int,
+        default=3,
+        help='Maximum parallel API requests (default: 3)'
+    )
     
     args = parser.parse_args()
+
+    if args.batch_size < 1:
+        parser.error("--batch-size must be >= 1")
+    if args.max_concurrent < 1:
+        parser.error("--max-concurrent must be >= 1")
     
     # Setup logging
     logger = setup_logging(LOGS_DIR)
@@ -799,6 +1100,8 @@ def main():
     logger.info("="*60)
     logger.info(f"Date: {args.date if args.date else 'today'}")
     logger.info(f"Max routes: {args.max_routes if args.max_routes else 'all'}")
+    logger.info(f"Batch size: {args.batch_size}")
+    logger.info(f"Max concurrent requests: {args.max_concurrent}")
     logger.info(f"Weather collection: {'enabled (legacy)' if args.with_weather else 'disabled (use separate forecast collection)'}")
     logger.info(f"Mode: {'INCREMENTAL (merge)' if args.incremental else 'STANDARD (new file)'}")
     logger.info("="*60 + "\n")
@@ -808,7 +1111,9 @@ def main():
         df = collect_train_data(
             service_date=args.date,
             max_routes=args.max_routes,
-            verbose=args.verbose
+            verbose=args.verbose,
+            batch_size=args.batch_size,
+            max_concurrent=args.max_concurrent
         )
         
         if df.empty:
