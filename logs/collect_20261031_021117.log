@@ -1,0 +1,45 @@
+2026-10-31 02:11:17,507 - __main__ - INFO - ============================================================
+2026-10-31 02:11:17,508 - __main__ - INFO - TRAIN DATA COLLECTION STARTED
+2026-10-31 02:11:17,508 - __main__ - INFO - ============================================================
+2026-10-31 02:11:17,508 - __main__ - INFO - Date: today
+2026-10-31 02:11:17,508 - __main__ - INFO - Max routes: all
+2026-10-31 02:11:17,508 - __main__ - INFO - Batch size: 10
+2026-10-31 02:11:17,508 - __main__ - INFO - Max concurrent requests: 5
+2026-10-31 02:11:17,508 - __main__ - INFO - Weather collection: disabled (use separate forecast collection)
+2026-10-31 02:11:17,508 - __main__ - INFO - Mode: INCREMENTAL (merge)
+2026-10-31 02:11:17,508 - __main__ - INFO - ============================================================
+
+2026-10-31 02:11:17,508 - root - INFO - Collecting train data for 2026-10-31
+2026-10-31 02:11:17,508 - root - INFO - Max routes: all
+2026-10-31 02:11:17,508 - root - INFO - Batch size: 10
+2026-10-31 02:11:17,508 - root - INFO - Max concurrent requests: 5
+2026-10-31 02:11:17,508 - root - INFO - Request timeout (s): 10
+2026-10-31 02:11:17,509 - root - INFO - Trying API endpoint: https://mavplusz.hu/otp2-backend/otp/gtfs/v1
+2026-10-31 02:11:24,316 - root - INFO - Successfully connected to: https://mavplusz.hu/otp2-backend/otp/gtfs/v1
+2026-10-31 02:20:47,062 - root - INFO - Fetched 136840 trains from API
+2026-10-31 02:20:58,763 - root - INFO - Converted to DataFrame: 1580668 rows × 23 columns
+2026-10-31 02:20:58,840 - root - INFO - Filtered to relevant trains: 1580668 → 39772 records (removed 1540896 future departures)
+2026-10-31 02:20:59,708 - root - INFO - Incremental save mode: 39772 new records
+2026-10-31 02:20:59,708 - utils.incremental_merge - INFO - No existing file at data/collected/trains_20261031.csv, returning new data
+2026-10-31 02:21:00,150 - root - INFO - Saved 39772 total records to data/collected/trains_20261031.csv
+2026-10-31 02:21:00,151 - root - INFO - File size: 13219.75 KB
+2026-10-31 02:21:00,236 - root - INFO - 
+============================================================
+2026-10-31 02:21:00,236 - root - INFO - COLLECTION SUMMARY
+2026-10-31 02:21:00,236 - root - INFO - ============================================================
+2026-10-31 02:21:00,236 - root - INFO - Total records: 39772
+2026-10-31 02:21:00,238 - root - INFO - Unique trains: 5732
+2026-10-31 02:21:00,239 - root - INFO - Unique routes: 1895
+2026-10-31 02:21:00,240 - root - INFO - Unique stations: 6272
+2026-10-31 02:21:00,241 - root - INFO - 
+Realtime data:
+2026-10-31 02:21:00,241 - root - INFO -   - Modified states: 936 (2.4%)
+2026-10-31 02:21:00,241 - root - INFO -   - Records with delays: 322 (0.8%)
+2026-10-31 02:21:00,243 - root - INFO -   - Average delay: 3.5 minutes
+2026-10-31 02:21:00,243 - root - INFO -   - Max delay: 72.0 minutes
+2026-10-31 02:21:00,243 - root - INFO -   - Min delay: -4.0 minutes
+2026-10-31 02:21:00,243 - root - INFO - ============================================================
+
+2026-10-31 02:21:00,243 - __main__ - INFO - ============================================================
+2026-10-31 02:21:00,243 - __main__ - INFO - COLLECTION COMPLETED SUCCESSFULLY
+2026-10-31 02:21:00,244 - __main__ - INFO - ============================================================
