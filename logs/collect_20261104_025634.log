@@ -1,0 +1,47 @@
+2026-11-04 02:56:34,438 - __main__ - INFO - ============================================================
+2026-11-04 02:56:34,438 - __main__ - INFO - TRAIN DATA COLLECTION STARTED
+2026-11-04 02:56:34,438 - __main__ - INFO - ============================================================
+2026-11-04 02:56:34,438 - __main__ - INFO - Date: today
+2026-11-04 02:56:34,438 - __main__ - INFO - Max routes: all
+2026-11-04 02:56:34,438 - __main__ - INFO - Batch size: 10
+2026-11-04 02:56:34,438 - __main__ - INFO - Max concurrent requests: 5
+2026-11-04 02:56:34,438 - __main__ - INFO - Weather collection: disabled (use separate forecast collection)
+2026-11-04 02:56:34,438 - __main__ - INFO - Mode: INCREMENTAL (merge)
+2026-11-04 02:56:34,438 - __main__ - INFO - ============================================================
+
+2026-11-04 02:56:34,438 - root - INFO - Collecting train data for 2026-11-04
+2026-11-04 02:56:34,438 - root - INFO - Max routes: all
+2026-11-04 02:56:34,439 - root - INFO - Batch size: 10
+2026-11-04 02:56:34,439 - root - INFO - Max concurrent requests: 5
+2026-11-04 02:56:34,439 - root - INFO - Request timeout (s): 10
+2026-11-04 02:56:34,439 - root - INFO - Trying API endpoint: https://mavplusz.hu/otp2-backend/otp/gtfs/v1
+2026-11-04 02:56:41,407 - root - INFO - Successfully connected to: https://mavplusz.hu/otp2-backend/otp/gtfs/v1
+2026-11-04 03:01:08,141 - root - WARNING - API returned HTTP 502 from https://mavplusz.hu/otp2-backend/otp/gtfs/v1
+2026-11-04 03:01:08,141 - root - WARNING - Response body: '<html>\r\n<head><title>502 Bad Gateway</title></head>\r\n<body>\r\n<center><h1>502 Bad Gateway</h1></center>\r\n<hr><center></center>\r\n</body>\r\n</html>\r\n'
+2026-11-04 03:08:10,925 - root - INFO - Fetched 174756 trains from API
+2026-11-04 03:08:22,187 - root - INFO - Converted to DataFrame: 2082716 rows × 23 columns
+2026-11-04 03:08:22,281 - root - INFO - Filtered to relevant trains: 2082716 → 92007 records (removed 1990709 future departures)
+2026-11-04 03:08:23,149 - root - INFO - Incremental save mode: 92007 new records
+2026-11-04 03:08:23,149 - utils.incremental_merge - INFO - No existing file at data/collected/trains_20261104.csv, returning new data
+2026-11-04 03:08:23,860 - root - INFO - Saved 92007 total records to data/collected/trains_20261104.csv
+2026-11-04 03:08:23,860 - root - INFO - File size: 30909.99 KB
+2026-11-04 03:08:23,980 - root - INFO - 
+============================================================
+2026-11-04 03:08:23,980 - root - INFO - COLLECTION SUMMARY
+2026-11-04 03:08:23,980 - root - INFO - ============================================================
+2026-11-04 03:08:23,980 - root - INFO - Total records: 92007
+2026-11-04 03:08:23,981 - root - INFO - Unique trains: 13130
+2026-11-04 03:08:23,984 - root - INFO - Unique routes: 3893
+2026-11-04 03:08:23,985 - root - INFO - Unique stations: 11045
+2026-11-04 03:08:23,986 - root - INFO - 
+Realtime data:
+2026-11-04 03:08:23,986 - root - INFO -   - Modified states: 1932 (2.1%)
+2026-11-04 03:08:23,986 - root - INFO -   - Records with delays: 802 (0.9%)
+2026-11-04 03:08:23,988 - root - INFO -   - Average delay: 2.5 minutes
+2026-11-04 03:08:23,988 - root - INFO -   - Max delay: 18.0 minutes
+2026-11-04 03:08:23,988 - root - INFO -   - Min delay: -4.0 minutes
+2026-11-04 03:08:23,988 - root - INFO - ============================================================
+
+2026-11-04 03:08:23,988 - __main__ - INFO - ============================================================
+2026-11-04 03:08:23,988 - __main__ - INFO - COLLECTION COMPLETED SUCCESSFULLY
+2026-11-04 03:08:23,988 - __main__ - INFO - ============================================================
